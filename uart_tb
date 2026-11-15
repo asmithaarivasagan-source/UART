@@ -1,0 +1,115 @@
+`timescale 1ns/1ps
+
+module uart_top_tb;
+
+reg clk;
+reg rst;
+reg tx_start;
+reg [7:0] tx_data;
+
+wire tx_serial;
+wire tx_busy;
+wire tx_done;
+
+wire [7:0] rx_data;
+wire rx_done;
+
+integer pass_count;
+integer fail_count;
+
+uart_top #(
+    .CLKS_PER_BIT(16)
+) dut (
+    .clk(clk),
+    .rst(rst),
+    .tx_start(tx_start),
+    .tx_data(tx_data),
+    .tx_serial(tx_serial),
+    .tx_busy(tx_busy),
+    .tx_done(tx_done),
+    .rx_data(rx_data),
+    .rx_done(rx_done)
+);
+
+// 100 MHz simulation clock: 10 ns period
+always #5 clk = ~clk;
+
+// Check received byte whenever RX finishes
+always @(posedge rx_done) begin
+    #1;
+
+    if (rx_data === tx_data) begin
+        $display("PASS: Transmitted = %h, Received = %h",
+                 tx_data, rx_data);
+        pass_count = pass_count + 1;
+    end
+    else begin
+        $display("FAIL: Expected = %h, Received = %h",
+                 tx_data, rx_data);
+        fail_count = fail_count + 1;
+    end
+end
+
+// Send one byte
+task send_byte;
+    input [7:0] value;
+    begin
+        @(negedge clk);
+        tx_data = value;
+        tx_start = 1'b1;
+
+        @(negedge clk);
+        tx_start = 1'b0;
+
+        wait(tx_done == 1'b1);
+        @(negedge clk);
+        repeat(3) @(negedge clk);
+    end
+endtask
+
+initial begin
+    clk = 0;
+    rst = 1;
+    tx_start = 0;
+    tx_data = 0;
+    pass_count = 0;
+    fail_count = 0;
+
+    $display("UART TX-RX LOOPBACK TEST STARTED");
+
+    repeat(5) @(negedge clk);
+    rst = 0;
+
+    send_byte(8'h41);
+    send_byte(8'hA5);
+    send_byte(8'h55);
+
+    // Allow the final RX result to be checked
+    wait(rx_done == 1'b1);
+    @(negedge clk);
+
+    $display("--------------------------------");
+    $display("PASS COUNT = %0d", pass_count);
+    $display("FAIL COUNT = %0d", fail_count);
+    $display("--------------------------------");
+
+    if (pass_count == 3 && fail_count == 0)
+        $display("UART LOOPBACK TEST PASSED");
+    else
+        $display("UART LOOPBACK TEST FAILED");
+
+    $finish;
+end
+
+initial begin
+    $dumpfile("uart_top_tb.vcd");
+    $dumpvars(0, uart_top_tb);
+end
+
+initial begin
+    #100000;
+    $display("ERROR: Simulation timeout");
+    $finish;
+end
+
+endmodule
