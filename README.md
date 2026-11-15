@@ -16,13 +16,9 @@ Features
 
 Project Structure
 
-rtl/
-├── uart_tx.v
-├── uart_rx.v
-└── uart_top.v
+design modules uart_tx.v,uart_rx.v,uart_top.v
 
-testbench/
-└── uart_top_tb.v
+testbench uart_top_tb.v
 
 Simulation
 
